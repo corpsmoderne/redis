@@ -4,7 +4,7 @@ use tokio::{
     sync::{mpsc, oneshot}
 };
 use std::net::SocketAddr;
-use crate::commands::Command;
+use crate::commands::{Command,Section};
 use crate::store::StoreCmd;
 
 pub struct Client {
@@ -47,6 +47,8 @@ impl Client {
                     self.handle_get(key).await,
                 Ok(Command::Set(key, value, timeout)) =>
                     self.handle_set(key, value, timeout).await,
+                Ok(Command::Info(section)) => 
+                    self.handle_info(section).await,
                 Err(err) => {
                     println!("=> {s}");
                     self.send_error(err).await
@@ -56,6 +58,14 @@ impl Client {
         println!("Client {:?} disconnected.", self.addr);
     }
 
+    async fn handle_info(&mut self, _section: Option<Section>) {
+        let response = "# Replication\r\nrole:master\r\n";
+        let resp = format!("${}\r\n{}\r\n", response.len(), response);
+        self.socket.write_all(resp.as_bytes())
+            .await.
+            expect("fail to send data");
+    }
+    
     async fn handle_get(&mut self, key: &str) {
         let (tx, rx) = oneshot::channel();
         self.store_tx.send(StoreCmd::Get(key.to_string(), tx))
@@ -96,7 +106,8 @@ impl Client {
             .await
             .expect("can't send data");
     }
-
+        
+        
     async fn send_error(&mut self, err: &str) {
         println!("Error: {err}");
         let berr = format!("-Error: {err}\r\n");

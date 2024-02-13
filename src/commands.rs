@@ -5,7 +5,13 @@ pub enum Command<'a> {
     Ping,
     Echo(&'a str),
     Get(&'a str),
-    Set(&'a str, &'a str, Option<u64>)
+    Set(&'a str, &'a str, Option<u64>),
+    Info(Option<Section>)
+}
+
+#[derive(Debug)]
+pub enum Section {
+    Replication
 }
 
 impl<'a> TryFrom<&'a str> for Command<'a> {
@@ -34,6 +40,17 @@ impl<'a> TryFrom<&'a str> for Command<'a> {
                 println!("set with timeout: {timeout}");                
                 Ok(Command::Set(key, value, Some(timeout)))
             },
+            ("info", xs) => {
+                let section = match xs {
+                    [""] => None,
+                    [_, "replication", ""] => Some(Section::Replication),
+                    [_, "REPLICATION", ""] => Some(Section::Replication),
+                    _ => {
+                        return Err("info: invalid section ");
+                    }
+                };
+                Ok(Command::Info(section))
+            }
             _ => Err("command parsing failed")
         }
     }
