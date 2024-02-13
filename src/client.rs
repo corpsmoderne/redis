@@ -3,14 +3,17 @@ use tokio::{
     net::TcpStream,
     sync::{mpsc, oneshot}
 };
+use std::sync::Arc;
 use std::net::SocketAddr;
 use crate::commands::{Command,Section};
 use crate::store::StoreCmd;
+use crate::conf::{Role,Conf};
 
 pub struct Client {
     pub addr: SocketAddr,
     pub socket: TcpStream,
-    pub store_tx: mpsc::Sender<StoreCmd>
+    pub store_tx: mpsc::Sender<StoreCmd>,
+    pub conf: Arc<Conf>
 }
 
 impl Client {
@@ -35,12 +38,12 @@ impl Client {
                     self.socket.write_all(b"+OK\r\n")
                         .await
                         .expect("fail to send data");
-                }
+                },
                 Ok(Command::Ping) => {
                     self.socket.write_all(b"+PONG\r\n")
                         .await
                         .expect("fail to send data");
-                }
+                },
                 Ok(Command::Echo(msg)) =>
                     self.send_echo(msg).await,
                 Ok(Command::Get(key)) =>
@@ -59,7 +62,11 @@ impl Client {
     }
 
     async fn handle_info(&mut self, _section: Option<Section>) {
-        let response = "# Replication\r\nrole:master\r\n";
+        let role = match self.conf.role {
+            Role::Master => "master",
+            Role::Servant{..} => "slave"
+        };
+        let response = format!("# Replication\r\nrole:{role}\r\n");
         let resp = format!("${}\r\n{}\r\n", response.len(), response);
         self.socket.write_all(resp.as_bytes())
             .await.
