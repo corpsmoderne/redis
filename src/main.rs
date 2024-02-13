@@ -25,22 +25,23 @@ async fn main() -> anyhow::Result<()> {
                 }
                 let s = String::from_utf8((&buff[0..size]).to_vec())
                     .expect("not utf8");
-                println!("{size} -> {s:?}");
                 
                 let tbl : Vec<&str> = s.split("\r\n").collect();
-
+                println!("{tbl:?}");
                 
                 match &tbl[..] {
-                    [_first, _second, "ping",_] => {
-                
+                   // [_first, _second, "ping", ""] => {
+                    _ => {
                         socket.write_all(b"+PONG\r\n")
                             .await
                             .expect("fail to send data");
                         
                     },
+                    /*
                     _ => {
                         println!("unknown command");
                     }
+                     */
                 }
 
             }
