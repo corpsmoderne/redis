@@ -6,13 +6,18 @@ use tokio::{
     net::TcpListener,
     sync::mpsc
 };
-
 use client::Client;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    let args : Vec<&str> = std::env::args().collect();
 
-    let listener = TcpListener::bind("127.0.0.1:6379").await?;
+    let port = match &args[..] {
+        ["--port", port] => port,
+        _ => "6379"
+    };
+    let addr = format!("127.0.0.1:{port}");
+    let listener = TcpListener::bind(&addr).await?;
 
     let (tx, rx) = mpsc::channel(32);
     tokio::spawn(async move {
