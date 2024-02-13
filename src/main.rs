@@ -1,5 +1,5 @@
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::net::TcpListener;
+use tokio::net::{TcpStream,TcpListener};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -27,21 +27,29 @@ async fn main() -> anyhow::Result<()> {
                     .expect("not utf8");
                 
                 let tbl : Vec<&str> = s.split("\r\n").collect();
-                println!("{tbl:?}");
+                //println!("{tbl:?}");
                 
                 match &tbl[..] {
-                   // [_first, _second, "ping", ""] => {
-                    _ => {
+                    [_first, _second, "ping", ""] => {
                         socket.write_all(b"+PONG\r\n")
                             .await
                             .expect("fail to send data");
                         
                     },
-                    /*
+                    [_first, _second, "echo", _, msg, ""] => {
+                        send_echo(&mut socket, msg).await
+                    },
+                    [_first, _second, "ECHO", _, msg, ""] => {
+                        send_echo(&mut socket, msg).await
+                    },
+                    
                     _ => {
-                        println!("unknown command");
+                        println!("Error: unknown command: {tbl:?}");
+                        socket.write_all(b"-Error : unknown command\r\n")
+                            .await
+                            .expect("can't send data");
                     }
-                     */
+                    
                 }
 
             }
@@ -49,4 +57,12 @@ async fn main() -> anyhow::Result<()> {
         });
     }
     
+}
+
+async fn send_echo(socket: &mut TcpStream, msg: &str) {
+    println!("Echo: {msg}");
+    let msg = format!("${}\r\n{}\r\n", msg.len(), msg);
+    socket.write_all(&msg.as_bytes())
+        .await
+        .expect("can't send data");
 }
