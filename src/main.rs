@@ -15,7 +15,7 @@ async fn main() -> anyhow::Result<()> {
 
         tokio::spawn(async move {
             let mut buff = vec![0 ; 512];
-
+            println!("Client connected.");
             loop {
                 let size = socket.read(&mut buff)
                     .await
