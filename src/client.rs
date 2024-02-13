@@ -62,11 +62,14 @@ impl Client {
     }
 
     async fn handle_info(&mut self, _section: Option<Section>) {
-        let role = match self.conf.role {
-            Role::Master => "master",
-            Role::Servant{..} => "slave"
+        let response = match self.conf.role {
+            Role::Master { ref repl_id, ref repl_offset } => {
+                format!("# Replication\r\nrole:master\r\nmaster_replid:{repl_id}\r\nmaster_repl_offset:{repl_offset}\r\n")
+            },
+            Role::Servant { ref host, ref port } => {
+                format!("# Replication\r\nrole:slave\r\nmaster_host:{host}\r\nmaster_port:{port}\r\n")
+            }
         };
-        let response = format!("# Replication\r\nrole:{role}\r\n");
         let resp = format!("${}\r\n{}\r\n", response.len(), response);
         self.socket.write_all(resp.as_bytes())
             .await.

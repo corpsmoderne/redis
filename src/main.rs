@@ -12,10 +12,7 @@ use client::Client;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let conf = Arc::new(conf::from_args()?);
-
-    println!("{conf:#?}");
-    
+    let conf = Arc::new(conf::from_args()?);    
     let addr = format!("127.0.0.1:{}", conf.port);
     let listener = TcpListener::bind(&addr).await?;
 

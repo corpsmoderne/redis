@@ -1,5 +1,7 @@
 use anyhow::Result;
 
+const REPL_ID : &str = "8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb";
+
 #[derive(Debug)]
 pub struct Conf {
     pub port: u16,
@@ -8,13 +10,15 @@ pub struct Conf {
 
 #[derive(Debug)]
 pub enum Role {
-    Master,
-    Servant((String,u16))
+    Master { repl_id: String, repl_offset: usize },
+    Servant { host: String, port: u16 }
 }
 
 pub fn from_args() -> Result<Conf> {
     let mut port = 6379;
-    let mut role = Role::Master;
+    let mut role = Role::Master { repl_id: REPL_ID.to_string(),
+                                  repl_offset: 0
+    };
     
     let mut args = std::env::args();
     
@@ -39,7 +43,7 @@ pub fn from_args() -> Result<Conf> {
                 let Some(p) = args.next() else {
                     anyhow::bail!("--replicaof needs a port")
                 };
-                role = Role::Servant((host, p.parse()?));
+                role = Role::Servant { host, port: p.parse()? }
             },
             _ => anyhow::bail!("unknown option")
         }
