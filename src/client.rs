@@ -53,6 +53,16 @@ impl Client {
                     self.handle_set(key, value, timeout).await,
                 Ok(Command::Info(section)) => 
                     self.handle_info(section).await,
+		Ok(Command::Replconf) => {
+		    Resp::Ok.send_to(&mut self.socket)
+			.await
+			.expect("Fail to send data")
+		},
+		Ok(Command::Psync(_,_)) => {
+		    Resp::Ok.send_to(&mut self.socket)
+			.await
+			.expect("Fail to send data")
+		},
                 Err(err) => {
                     println!("=> {s}");
                     self.send_error(err).await

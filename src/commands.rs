@@ -6,7 +6,9 @@ pub enum Command<'a> {
     Echo(&'a str),
     Get(&'a str),
     Set(&'a str, &'a str, Option<u64>),
-    Info(Option<Section>)
+    Info(Option<Section>),
+    Replconf,
+    Psync(&'a str, i32)
 }
 
 #[derive(Debug)]
@@ -50,7 +52,12 @@ impl<'a> TryFrom<&'a str> for Command<'a> {
                     }
                 };
                 Ok(Command::Info(section))
-            }
+            },
+	    ("replconf", _xs) => {
+		println!("~=> {xs:#?}");
+		Ok(Command::Replconf)
+	    },
+	    ("psync", ["$1", s, "$2", "-1", ""]) => Ok(Command::Psync(s, -1)),
             _ => Err("command parsing failed")
         }
     }
