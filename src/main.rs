@@ -94,4 +94,17 @@ async fn servant_handshake(conf: Arc<Conf>) {
         panic!("bad capa handshake");
     }    
 
+    Resp::from(["PSYNC", "?", "-1"])
+	.send_to(&mut socket)
+	.await
+	.expect("Can't send REPLCONF");
+    let size = socket.read(&mut buff)
+        .await
+        .expect("Can't recieve handshake");
+
+    let s = String::from_utf8((buff[0..size]).to_vec())
+        .expect("not utf8");
+    println!("=> {s:?}");
+
+    
 }
