@@ -49,6 +49,8 @@ async fn main() -> anyhow::Result<()> {
 }
 
 async fn servant_handshake(conf: Arc<Conf>) {
+    let listen_port = conf.port;
+    
     let Role::Servant { ref host, ref port } = conf.role else {
         panic!("can't be there");
     };
@@ -69,8 +71,8 @@ async fn servant_handshake(conf: Arc<Conf>) {
         panic!("bad pong handshake");
     }
     
-    let port = port.to_string();
-    Resp::from(["REPLCONF", "listening-port", &port])
+    let listen_port = listen_port.to_string();
+    Resp::from(["REPLCONF", "listening-port", &listen_port])
 	.send_to(&mut socket)
 	.await
 	.expect("Can't send REPLCONF");
