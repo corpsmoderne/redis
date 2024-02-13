@@ -9,6 +9,11 @@ pub enum Resp {
 }
 
 impl Resp {
+    pub fn full_resync(id: &str, offset: usize) -> Self {
+	let s = format!("+FULLRESYNC {id} {offset}\r\n");
+	Resp::Array(s.as_bytes().to_vec())
+    }
+    
     pub fn to_vec(self) -> Vec<u8> {
 	match self {
 	    Resp::Ok => (b"+OK\r\n").to_vec(),

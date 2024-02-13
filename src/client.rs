@@ -59,7 +59,13 @@ impl Client {
 			.expect("Fail to send data")
 		},
 		Ok(Command::Psync(_,_)) => {
-		    Resp::Ok.send_to(&mut self.socket)
+		    let Role::Master { ref repl_id, ref repl_offset } =
+			self.conf.role else {
+			    self.send_error("I'm not a master.").await;
+			    continue;
+			};
+		    Resp::full_resync(repl_id, *repl_offset)
+			.send_to(&mut self.socket)
 			.await
 			.expect("Fail to send data")
 		},

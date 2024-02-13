@@ -8,7 +8,7 @@ pub enum Command<'a> {
     Set(&'a str, &'a str, Option<u64>),
     Info(Option<Section>),
     Replconf,
-    Psync(&'a str, i32)
+    Psync(Option<&'a str>, i32)
 }
 
 #[derive(Debug)]
@@ -57,7 +57,8 @@ impl<'a> TryFrom<&'a str> for Command<'a> {
 		println!("~=> {xs:#?}");
 		Ok(Command::Replconf)
 	    },
-	    ("psync", ["$1", s, "$2", "-1", ""]) => Ok(Command::Psync(s, -1)),
+	    ("psync", ["$1", s, "$2", "-1", ""]) =>
+		Ok(Command::Psync(if s == &"?" { None } else { Some(s) }, -1)),
             _ => Err("command parsing failed")
         }
     }
