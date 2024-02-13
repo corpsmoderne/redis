@@ -2,6 +2,7 @@ mod commands;
 mod store;
 mod client;
 mod conf;
+mod resp;
 
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
@@ -11,6 +12,7 @@ use tokio::{
 use std::sync::Arc;
 use client::Client;
 use conf::{Conf,Role};
+use resp::Resp;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -55,7 +57,7 @@ async fn servant_handshake(conf: Arc<Conf>) {
     let mut socket = TcpStream::connect(master_addr).await
         .expect("Can't establish connection with master");
 
-    socket.write_all(b"*1\r\n$4\r\nping\r\n").await
+    socket.write_all(&Resp::from(["ping"]).to_vec()).await
         .expect("Can't send handshake");
     
     let mut buff = vec![0 ; 512];
@@ -63,10 +65,31 @@ async fn servant_handshake(conf: Arc<Conf>) {
         .await
         .expect("Can't recieve handshake");
     
-    let s = String::from_utf8((buff[0..size]).to_vec())
-        .expect("not utf8");
-    if s != "+PONG\r\n" {
+    if buff[0..size] != Resp::Pong.to_vec() {
         panic!("bad pong handshake");
     }
+    
+    let port = port.to_string();
+    Resp::from(["REPLCONF", "listening-port", &port])
+	.send_to(&mut socket)
+	.await
+	.expect("Can't send REPLCONF");
+    let size = socket.read(&mut buff)
+        .await
+        .expect("Can't recieve handshake");
+    if buff[0..size] != Resp::Ok.to_vec() {
+        panic!("bad REPLCONF listening-port handshake");
+    }    
+
+    Resp::from(["REPLCONF", "capa", "psync2"])
+	.send_to(&mut socket)
+	.await
+	.expect("Can't send REPLCONF");
+    let size = socket.read(&mut buff)
+        .await
+        .expect("Can't recieve handshake");
+    if buff[0..size] != Resp::Ok.to_vec() {
+        panic!("bad capa handshake");
+    }    
 
 }
