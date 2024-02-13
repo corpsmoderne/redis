@@ -35,39 +35,27 @@ impl Client {
                 .expect("not utf8");
             
             match Command::try_from(s.as_str()) {
-                Ok(Command::Commands) => {
-		    Resp::Ok.send_to(&mut self.socket)
-			.await
-			.expect("fail to send data");
-                },
-                Ok(Command::Ping) => {
-		    Resp::Pong.send_to(&mut self.socket)
-			.await
-			.expect("fail to send data");
-                },
+                Ok(Command::Commands) => 
+		    self.send(Resp::Ok).await,
+                Ok(Command::Ping) =>
+		    self.send(Resp::Pong).await,
                 Ok(Command::Echo(msg)) =>
-                    self.send_echo(msg).await,
+		    self.send(Resp::from(msg)).await,
                 Ok(Command::Get(key)) =>
                     self.handle_get(key).await,
                 Ok(Command::Set(key, value, timeout)) =>
                     self.handle_set(key, value, timeout).await,
                 Ok(Command::Info(section)) => 
                     self.handle_info(section).await,
-		Ok(Command::Replconf) => {
-		    Resp::Ok.send_to(&mut self.socket)
-			.await
-			.expect("Fail to send data")
-		},
+		Ok(Command::Replconf) =>
+		    self.send(Resp::Ok).await,
 		Ok(Command::Psync(_,_)) => {
 		    let Role::Master { ref repl_id, ref repl_offset } =
 			self.conf.role else {
 			    self.send_error("I'm not a master.").await;
 			    continue;
 			};
-		    Resp::full_resync(repl_id, *repl_offset)
-			.send_to(&mut self.socket)
-			.await
-			.expect("Fail to send data")
+		    self.send(Resp::full_resync(repl_id, *repl_offset)).await;
 		},
                 Err(err) => {
                     println!("=> {s}");
@@ -87,9 +75,7 @@ impl Client {
                 format!("# Replication\r\nrole:slave\r\nmaster_host:{host}\r\nmaster_port:{port}\r\n")
             }
         };
-        Resp::from(response.as_str()).send_to(&mut self.socket)
-            .await.
-            expect("fail to send data");
+        self.send(Resp::from(response.as_str())).await;
     }
     
     async fn handle_get(&mut self, key: &str) {
@@ -102,9 +88,7 @@ impl Client {
         } else {
 	    Resp::Nil
         };
-        self.socket.write_all(&resp.to_vec())
-            .await
-            .expect("fail to send data");
+	self.send(resp).await;
     }
 
     async fn handle_set(
@@ -120,24 +104,20 @@ impl Client {
             .await
             .expect("internal server error (channel)");
         rx.await.unwrap();
-	Resp::Ok.send_to(&mut self.socket)
-            .await
-            .expect("fail to send data");
+	self.send(Resp::Ok).await
     }
     
-    async fn send_echo(&mut self, msg: &str) {
-        println!("Echo: {msg}");
-        
-        Resp::from(msg).send_to(&mut self.socket)
-            .await
-            .expect("can't send data");
-    }
-        
     async fn send_error(&mut self, err: &str) {
         println!("Error: {err}");
         let berr = format!("-Error: {err}\r\n");
         self.socket.write_all(berr.as_bytes())
             .await
             .expect("can't send data");
+    }
+
+    async fn send(&mut self, resp: Resp) {
+	resp.send_to(&mut self.socket)
+	    .await
+	    .expect("can't send data")
     }
 }
