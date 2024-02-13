@@ -1,11 +1,11 @@
     
 #[derive(Debug)]
 pub enum Command<'a> {
+    Commands,
     Ping,
-    Pong,
     Echo(&'a str),
     Get(&'a str),
-    Set(&'a str, &'a str)
+    Set(&'a str, &'a str, Option<u64>)
 }
 
 impl<'a> TryFrom<&'a str> for Command<'a> {
@@ -13,25 +13,28 @@ impl<'a> TryFrom<&'a str> for Command<'a> {
 
     fn try_from(s: &'a str) -> Result<Self, Self::Error> {
         let tbl : Vec<&str> = s.split("\r\n").collect();
-        match &tbl[..] {
-            ["*1", "$4", "PING", ""] => Ok(Command::Ping),
-            ["*1", "$4", "ping", ""] => Ok(Command::Ping),
+        let (cmd, xs) = match &tbl[..] {
+            [_, _, cmd, xs@..] => (cmd, xs),
+            _ => {
+                return Err("command parsing failed");
+            }
+        };
 
-            ["+PONG", ""] => Ok(Command::Pong),
-            ["+pong", ""] => Ok(Command::Pong),
-            
-            ["*2", "$4", "ECHO", _, msg, ""] => Ok(Command::Echo(msg)),
-            ["*2", "$4", "echo", _, msg, ""] => Ok(Command::Echo(msg)),
-
-            ["*2", "$3", "get", _, key, ""] => Ok(Command::Get(key)),
-            ["*2", "$3", "GET", _, key, ""] => Ok(Command::Get(key)),
-
-            ["*3", "$3", "set", _, key, _, value, ""] =>
-                Ok(Command::Set(key, value)),
-            ["*3", "$3", "SET", _, key, _, value, ""] =>
-                Ok(Command::Set(key, value)),
-            _ => Err("unknown command")
+        match (&cmd.to_lowercase()[..], xs) {
+            ("command", _) => Ok(Command::Commands),
+            ("ping", _) => Ok(Command::Ping),
+            ("echo", [_, msg, ""]) => Ok(Command::Echo(msg)),
+            ("get", [_, key, ""]) => Ok(Command::Get(key)),
+            ("set", [_, key, _, value, ""]) =>
+                Ok(Command::Set(key, value, None)),
+            ("set", [_, key, _, value, _, "px", _, timeout, ""]) => {
+                let Ok(timeout) : Result<u64,_> = timeout.parse() else {
+                    return Err("timeout is not a number");
+                };
+                println!("set with timeout: {timeout}");                
+                Ok(Command::Set(key, value, Some(timeout)))
+            },
+            _ => Err("command parsing failed")
         }
-        
     }
 }
