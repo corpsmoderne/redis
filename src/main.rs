@@ -1,18 +1,30 @@
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::net::{TcpStream,TcpListener};
+mod commands;
+mod store;
+
+use tokio::{
+    io::{AsyncReadExt, AsyncWriteExt},
+    net::{TcpStream,TcpListener},
+    sync::{mpsc, oneshot}
+};
+use commands::Command;
+use store::{store_server,StoreCmd};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    // You can use print statements as follows for debugging, they'll be visible when running tests.
-    println!("Logs from your program will appear here!");
-
-    // Uncomment this block to pass the first stage
 
     let listener = TcpListener::bind("127.0.0.1:6379").await?;
 
+    let (tx, rx) = mpsc::channel(32);
+    tokio::spawn(async move {
+        store_server(rx).await;
+    });
+
+    println!("Server running.");
+    
     loop {
         let (mut socket, _) = listener.accept().await?;
-
+        let my_tx = tx.clone();
+        
         tokio::spawn(async move {
             let mut buff = vec![0 ; 512];
             println!("Client connected.");
@@ -25,38 +37,60 @@ async fn main() -> anyhow::Result<()> {
                 }
                 let s = String::from_utf8((&buff[0..size]).to_vec())
                     .expect("not utf8");
-                
-                let tbl : Vec<&str> = s.split("\r\n").collect();
-                //println!("{tbl:?}");
-                
-                match &tbl[..] {
-                    [_first, _second, "ping", ""] => {
+
+                match Command::try_from(s.as_str()) {
+                    Err(err) => send_error(&mut socket, err).await,
+                    Ok(Command::Ping) => {
                         socket.write_all(b"+PONG\r\n")
                             .await
                             .expect("fail to send data");
-                        
-                    },
-                    [_first, _second, "echo", _, msg, ""] => {
-                        send_echo(&mut socket, msg).await
-                    },
-                    [_first, _second, "ECHO", _, msg, ""] => {
-                        send_echo(&mut socket, msg).await
-                    },
-                    
-                    _ => {
-                        println!("Error: unknown command: {tbl:?}");
-                        socket.write_all(b"-Error : unknown command\r\n")
-                            .await
-                            .expect("can't send data");
                     }
-                    
+                    Ok(Command::Pong) => {
+                        println!("PONG!");
+                    },
+                    Ok(Command::Echo(msg)) => {
+                        send_echo(&mut socket, msg).await;
+                    },
+                    Ok(Command::Get(key)) => {
+                        let (tx, rx) = oneshot::channel();
+                        my_tx.send(StoreCmd::Get(key.to_string(), tx))
+                            .await
+                            .expect("internal server error (channel)");
+                        let resp = if let Some(value) = rx.await.unwrap() {
+                            format!("${}\r\n{}\r\n", value.len(), value)
+                        } else {
+                            "$-1\r\n".to_string()
+                        };
+                        socket.write_all(resp.as_bytes())
+                            .await
+                            .expect("fail to send data");
+                    },
+                    Ok(Command::Set(key, value)) => {
+                        let (tx, rx) = oneshot::channel();                        
+                        my_tx.send(StoreCmd::Set(key.to_string(),
+                                                 value.to_string(),
+                                                 tx))
+                            .await
+                            .expect("internal server error (channel)");
+                        let _ = rx.await.unwrap();
+                        socket.write_all(b"+OK\r\n")
+                            .await
+                            .expect("fail to send data");
+                    }
                 }
-
             }
             println!("Client disconnected.");
         });
     }
     
+}
+
+async fn send_error(socket: &mut TcpStream, err: &str) {
+    println!("Error: {err}");
+    let berr = format!("-Error: {err}\r\n");
+    socket.write_all(berr.as_bytes())
+        .await
+        .expect("can't send data");
 }
 
 async fn send_echo(socket: &mut TcpStream, msg: &str) {
