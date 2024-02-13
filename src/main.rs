@@ -10,11 +10,17 @@ use client::Client;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let args : Vec<&str> = std::env::args().collect();
-
-    let port = match &args[..] {
-        ["--port", port] => port,
-        _ => "6379"
+    let args : Vec<String> = std::env::args().collect();
+    let args2 : Vec<&str> = args.iter()
+        .map(| s | &**s)
+        .collect();
+    
+    let port = match &args2[..] {
+        [_, "--port", port] => {
+            let port = port.parse::<u16>()?;
+            port
+        },
+        _ => 6379
     };
     let addr = format!("127.0.0.1:{port}");
     let listener = TcpListener::bind(&addr).await?;
@@ -24,7 +30,7 @@ async fn main() -> anyhow::Result<()> {
         store::store_server(rx).await;
     });
 
-    println!("Server running.");
+    println!("Server running on {addr}.");
     
     loop {
         let (socket, addr) = listener.accept().await?;
