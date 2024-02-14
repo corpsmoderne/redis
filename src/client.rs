@@ -8,6 +8,7 @@ use std::net::SocketAddr;
 use crate::commands::{Command,Section};
 use crate::store::StoreCmd;
 use crate::conf::{Role,Conf};
+use crate::resp::Resp;
 
 pub struct Client {
     pub addr: SocketAddr,
@@ -34,24 +35,28 @@ impl Client {
                 .expect("not utf8");
             
             match Command::try_from(s.as_str()) {
-                Ok(Command::Commands) => {
-                    self.socket.write_all(b"+OK\r\n")
-                        .await
-                        .expect("fail to send data");
-                },
-                Ok(Command::Ping) => {
-                    self.socket.write_all(b"+PONG\r\n")
-                        .await
-                        .expect("fail to send data");
-                },
+                Ok(Command::Commands) => 
+		    self.send(Resp::Ok).await,
+                Ok(Command::Ping) =>
+		    self.send(Resp::Pong).await,
                 Ok(Command::Echo(msg)) =>
-                    self.send_echo(msg).await,
+		    self.send(Resp::from(msg)).await,
                 Ok(Command::Get(key)) =>
                     self.handle_get(key).await,
                 Ok(Command::Set(key, value, timeout)) =>
                     self.handle_set(key, value, timeout).await,
                 Ok(Command::Info(section)) => 
                     self.handle_info(section).await,
+		Ok(Command::Replconf) =>
+		    self.send(Resp::Ok).await,
+		Ok(Command::Psync(_,_)) => {
+		    let Role::Master { ref repl_id, ref repl_offset } =
+			self.conf.role else {
+			    self.send_error("I'm not a master.").await;
+			    continue;
+			};
+		    self.send(Resp::full_resync(repl_id, *repl_offset)).await;
+		},
                 Err(err) => {
                     println!("=> {s}");
                     self.send_error(err).await
@@ -70,10 +75,7 @@ impl Client {
                 format!("# Replication\r\nrole:slave\r\nmaster_host:{host}\r\nmaster_port:{port}\r\n")
             }
         };
-        let resp = format!("${}\r\n{}\r\n", response.len(), response);
-        self.socket.write_all(resp.as_bytes())
-            .await.
-            expect("fail to send data");
+        self.send(Resp::from(response.as_str())).await;
     }
     
     async fn handle_get(&mut self, key: &str) {
@@ -82,13 +84,11 @@ impl Client {
             .await
             .expect("internal server error (channel)");
         let resp = if let Some(value) = rx.await.unwrap() {
-            format!("${}\r\n{}\r\n", value.len(), value)
+	    Resp::from(value.as_str())
         } else {
-            "$-1\r\n".to_string()
+	    Resp::Nil
         };
-        self.socket.write_all(resp.as_bytes())
-            .await
-            .expect("fail to send data");
+	self.send(resp).await;
     }
 
     async fn handle_set(
@@ -104,25 +104,20 @@ impl Client {
             .await
             .expect("internal server error (channel)");
         rx.await.unwrap();
-        self.socket.write_all(b"+OK\r\n")
-            .await
-            .expect("fail to send data");
+	self.send(Resp::Ok).await
     }
     
-    async fn send_echo(&mut self, msg: &str) {
-        println!("Echo: {msg}");
-        let msg = format!("${}\r\n{}\r\n", msg.len(), msg);
-        self.socket.write_all(msg.as_bytes())
-            .await
-            .expect("can't send data");
-    }
-        
-        
     async fn send_error(&mut self, err: &str) {
         println!("Error: {err}");
         let berr = format!("-Error: {err}\r\n");
         self.socket.write_all(berr.as_bytes())
             .await
             .expect("can't send data");
+    }
+
+    async fn send(&mut self, resp: Resp) {
+	resp.send_to(&mut self.socket)
+	    .await
+	    .expect("can't send data")
     }
 }
