@@ -4,11 +4,13 @@ mod client;
 mod conf;
 
 use tokio::{
-    net::TcpListener,
+    io::{AsyncReadExt, AsyncWriteExt},
+    net::{TcpStream,TcpListener},
     sync::mpsc
 };
 use std::sync::Arc;
 use client::Client;
+use conf::{Conf,Role};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -22,6 +24,13 @@ async fn main() -> anyhow::Result<()> {
     });
 
     println!("Server running on {addr}.");
+
+    if !conf.is_master() {
+        let conf2 = conf.clone();
+        tokio::spawn(async move {
+            servant_handshake(conf2).await;
+        });
+    }
     
     loop {
         let (socket, addr) = listener.accept().await?;
@@ -37,3 +46,27 @@ async fn main() -> anyhow::Result<()> {
     
 }
 
+async fn servant_handshake(conf: Arc<Conf>) {
+    let Role::Servant { ref host, ref port } = conf.role else {
+        panic!("can't be there");
+    };
+
+    let master_addr = format!("{host}:{port}");
+    let mut socket = TcpStream::connect(master_addr).await
+        .expect("Can't establish connection with master");
+
+    socket.write_all(b"*1\r\n$4\r\nping\r\n").await
+        .expect("Can't send handshake");
+    
+    let mut buff = vec![0 ; 512];
+    let size = socket.read(&mut buff)
+        .await
+        .expect("Can't recieve handshake");
+    
+    let s = String::from_utf8((buff[0..size]).to_vec())
+        .expect("not utf8");
+    if s != "+PONG\r\n" {
+        panic!("bad pong handshake");
+    }
+
+}

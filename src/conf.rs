@@ -8,6 +8,15 @@ pub struct Conf {
     pub role: Role
 }
 
+impl Conf {
+    pub fn is_master(&self) -> bool {
+        match self.role {
+            Role::Master{..} => true,
+            _ => false
+        }
+    }
+}
+
 #[derive(Debug)]
 pub enum Role {
     Master { repl_id: String, repl_offset: usize },
