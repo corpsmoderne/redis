@@ -36,9 +36,9 @@ impl Client {
             
             match Command::try_from(s.as_str()) {
                 Ok(Command::Commands) => 
-		    self.send(Resp::Ok).await,
+		    self.send(Resp::ok()).await,
                 Ok(Command::Ping) =>
-		    self.send(Resp::Pong).await,
+		    self.send(Resp::pong()).await,
                 Ok(Command::Echo(msg)) =>
 		    self.send(Resp::from(msg)).await,
                 Ok(Command::Get(key)) =>
@@ -48,7 +48,7 @@ impl Client {
                 Ok(Command::Info(section)) => 
                     self.handle_info(section).await,
 		Ok(Command::Replconf) =>
-		    self.send(Resp::Ok).await,
+		    self.send(Resp::ok()).await,
 		Ok(Command::Psync(_,_)) => {
 		    let Role::Master { ref repl_id, ref repl_offset } =
 			self.conf.role else {
@@ -86,7 +86,7 @@ impl Client {
         let resp = if let Some(value) = rx.await.unwrap() {
 	    Resp::from(value.as_str())
         } else {
-	    Resp::Nil
+	    Resp::nil()
         };
 	self.send(resp).await;
     }
@@ -104,7 +104,7 @@ impl Client {
             .await
             .expect("internal server error (channel)");
         rx.await.unwrap();
-	self.send(Resp::Ok).await
+	self.send(Resp::ok()).await
     }
     
     async fn send_error(&mut self, err: &str) {
@@ -116,7 +116,7 @@ impl Client {
     }
 
     async fn send(&mut self, resp: Resp) {
-	resp.send_to(&mut self.socket)
+        self.socket.write_all(resp.as_bytes())
 	    .await
 	    .expect("can't send data")
     }

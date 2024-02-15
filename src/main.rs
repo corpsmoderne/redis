@@ -58,7 +58,7 @@ async fn servant_handshake(conf: Arc<Conf>) {
     let mut socket = TcpStream::connect(master_addr).await
         .expect("Can't establish connection with master");
 
-    socket.write_all(&Resp::from(["ping"]).to_vec()).await
+    socket.write_all(Resp::from(["ping"]).as_bytes()).await
         .expect("Can't send handshake");
     
     let mut buff = vec![0 ; 512];
@@ -66,35 +66,38 @@ async fn servant_handshake(conf: Arc<Conf>) {
         .await
         .expect("Can't recieve handshake");
     
-    if buff[0..size] != Resp::Pong.to_vec() {
+    if &buff[0..size] != Resp::pong().as_bytes() {
         panic!("bad pong handshake");
     }
     
     let listen_port = listen_port.to_string();
-    Resp::from(["REPLCONF", "listening-port", &listen_port])
-	.send_to(&mut socket)
+    socket.write_all(
+        Resp::from(["REPLCONF", "listening-port", &listen_port]).as_bytes()
+    )
 	.await
 	.expect("Can't send REPLCONF");
     let size = socket.read(&mut buff)
         .await
         .expect("Can't recieve handshake");
-    if buff[0..size] != Resp::Ok.to_vec() {
+    if &buff[0..size] != Resp::ok().as_bytes() {
         panic!("bad REPLCONF listening-port handshake");
     }    
 
-    Resp::from(["REPLCONF", "capa", "psync2"])
-	.send_to(&mut socket)
+    socket.write_all(
+        Resp::from(["REPLCONF", "capa", "psync2"]).as_bytes()
+    )
 	.await
 	.expect("Can't send REPLCONF");
     let size = socket.read(&mut buff)
         .await
         .expect("Can't recieve handshake");
-    if buff[0..size] != Resp::Ok.to_vec() {
+    if &buff[0..size] != Resp::ok().as_bytes() {
         panic!("bad capa handshake");
     }    
 
-    Resp::from(["PSYNC", "?", "-1"])
-	.send_to(&mut socket)
+    socket.write_all(
+        Resp::from(["PSYNC", "?", "-1"]).as_bytes()
+    )
 	.await
 	.expect("Can't send REPLCONF");
     let size = socket.read(&mut buff)
