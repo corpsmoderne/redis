@@ -107,4 +107,23 @@ async fn servant_handshake(conf: Arc<Conf>) {
     let s = String::from_utf8((buff[0..size]).to_vec())
         .expect("not utf8");
     println!("=> {s:?}");
+
+    loop {
+	let size = socket.read(&mut buff)
+            .await
+            .expect("Can't recieve handshake");
+	let a = buff[0..size].to_vec();
+	let mut xs = a.split(| b | b == &b'\n');
+	if let Some(first) = xs.next() {
+	    if let Ok(s) = String::from_utf8(first.to_vec()) {
+		println!("== {s:?}");
+	    } else {
+		println!("!! {first:#?}");
+	    }
+	} else {
+	    let s = String::from_utf8(a).unwrap();
+	    println!("~~ {s:?}");
+	}
+    }
+
 }

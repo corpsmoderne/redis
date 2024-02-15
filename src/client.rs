@@ -10,6 +10,17 @@ use crate::store::StoreCmd;
 use crate::conf::{Role,Conf};
 use crate::resp::Resp;
 
+const DB : [u8 ; 88] = [
+   82,  69,  68,  73,  83,  48,  48,  49,  49, 250,   9, 114,
+  101, 100, 105, 115,  45, 118, 101, 114,   5,  55,  46,  50,
+   46,  48, 250,  10, 114, 101, 100, 105, 115,  45,  98, 105,
+  116, 115, 192,  64, 250,   5,  99, 116, 105, 109, 101, 194,
+  109,   8, 188, 101, 250,   8, 117, 115, 101, 100,  45, 109,
+  101, 109, 194, 176, 196,  16,   0, 250,   8,  97, 111, 102,
+   45,  98,  97, 115, 101, 192,   0, 255, 240, 110,  59, 254,
+  192, 255,  90, 162
+];
+
 pub struct Client {
     pub addr: SocketAddr,
     pub socket: TcpStream,
@@ -49,14 +60,8 @@ impl Client {
                     self.handle_info(section).await,
 		Ok(Command::Replconf) =>
 		    self.send(Resp::ok()).await,
-		Ok(Command::Psync(_,_)) => {
-		    let Role::Master { ref repl_id, ref repl_offset } =
-			self.conf.role else {
-			    self.send_error("I'm not a master.").await;
-			    continue;
-			};
-		    self.send(Resp::full_resync(repl_id, *repl_offset)).await;
-		},
+		Ok(Command::Psync(_,_)) =>
+		    self.handle_master().await,
                 Err(err) => {
                     println!("=> {s}");
                     self.send_error(err).await
@@ -66,6 +71,18 @@ impl Client {
         println!("Client {:?} disconnected.", self.addr);
     }
 
+    async fn handle_master(&mut self) {
+	let Role::Master { ref repl_id, ref repl_offset } =
+	    self.conf.role else {
+		self.send_error("I'm not a master.").await;
+		return;
+	    };
+	self.send(Resp::full_resync(repl_id, *repl_offset)).await;
+	self.socket.write_all(b"$88\r\n").await.expect("can't send data");
+	self.socket.write_all(&DB).await.expect("can't send data");
+		
+    }	
+    
     async fn handle_info(&mut self, _section: Option<Section>) {
         let response = match self.conf.role {
             Role::Master { ref repl_id, ref repl_offset } => {
