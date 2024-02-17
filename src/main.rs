@@ -57,7 +57,12 @@ async fn servant_handshake(conf: Arc<Conf>, tx: mpsc::Sender<StoreCmd>) {
     let Role::Servant { ref host, ref port } = conf.role else {
         panic!("can't be there");
     };
-
+    let host = if host == "localhost" {
+	"127.0.0.1"
+    } else {
+	host
+    };
+    
     let master_addr = format!("{host}:{port}");
     let mut socket = TcpStream::connect(&master_addr).await
         .expect("Can't establish connection with master");
