@@ -30,7 +30,8 @@ pub struct Client {
     pub addr: SocketAddr,
     pub socket: TcpStream,
     pub store_tx: mpsc::Sender<StoreCmd>,
-    pub conf: Arc<Conf>
+    pub conf: Arc<Conf>,
+    pub replica: bool
 }
 
 impl Client {
@@ -132,7 +133,9 @@ impl Client {
             .await
             .expect("internal server error (channel)");
         rx.await.unwrap();
-	self.send(Resp::ok()).await
+	if !self.replica {
+	    self.send(Resp::ok()).await
+	}
     }
     
     async fn send_error(&mut self, err: &str) {

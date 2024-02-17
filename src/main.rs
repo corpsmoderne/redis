@@ -42,7 +42,8 @@ async fn main() -> anyhow::Result<()> {
 
         let client = Client { addr, socket,
                               store_tx: tx.clone(),
-                              conf: conf.clone()
+                              conf: conf.clone(),
+			      replica: false
         };
         tokio::spawn(async move {
             client.handle().await;
@@ -124,7 +125,8 @@ async fn servant_handshake(conf: Arc<Conf>, tx: mpsc::Sender<StoreCmd>) {
     let client = Client { addr: (master_addr[..]).parse().unwrap(),
 			  socket,
                           store_tx: tx.clone(),
-                          conf
+                          conf,
+			  replica: true
     };
     client.handle().await;
 }
