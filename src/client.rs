@@ -5,7 +5,7 @@ use tokio::{
 };
 use std::sync::Arc;
 use std::net::SocketAddr;
-use crate::commands::{Command,Section};
+use crate::commands::{Command,CommandIter,Section};
 use crate::store::StoreCmd;
 use crate::conf::{Role,Conf};
 use crate::resp::Resp;
@@ -52,33 +52,35 @@ impl Client {
             }
             let s = String::from_utf8((buff[0..size]).to_vec())
                 .expect("not utf8");
-            
-            match Command::try_from(s.as_str()) {
-                Ok(Command::Commands) => 
-		    self.send(Resp::ok()).await,
-                Ok(Command::Ping) =>
-		    self.send(Resp::pong()).await,
-                Ok(Command::Echo(msg)) =>
-		    self.send(Resp::from(msg)).await,
-                Ok(Command::Get(key)) =>
-                    self.handle_get(key).await,
-                Ok(Command::Set(key, value, timeout)) =>
-                    self.handle_set(key, value, timeout).await,
-                Ok(Command::Info(section)) => 
-                    self.handle_info(section).await,
-		Ok(Command::Replconf) =>
-		    self.send(Resp::ok()).await,
-		Ok(Command::Psync(_,_)) =>
-		    return self.handle_master().await,
-		Ok(Command::Err(error)) => {
-		    println!("** Error: {error:#?}");
-		},
-                Err(err) => {
-                    //println!("=> {s}");
-                    self.send_error(err).await
-                }                
+
+	    for next_cmd in (CommandIter { s: &s })  {
+		match next_cmd {
+                    Ok(Command::Commands) => 
+			self.send(Resp::ok()).await,
+                    Ok(Command::Ping) =>
+			self.send(Resp::pong()).await,
+                    Ok(Command::Echo(msg)) =>
+			self.send(Resp::from(msg)).await,
+                    Ok(Command::Get(key)) =>
+			self.handle_get(key).await,
+                    Ok(Command::Set(key, value, timeout)) =>
+			self.handle_set(key, value, timeout).await,
+                    Ok(Command::Info(section)) => 
+			self.handle_info(section).await,
+		    Ok(Command::Replconf) =>
+			self.send(Resp::ok()).await,
+		    Ok(Command::Psync(_,_)) =>
+			return self.handle_master().await,
+		    Ok(Command::Err(error)) => {
+			println!("** Error: {error:#?}");
+		    },
+                    Err(err) => {
+			self.send_error(err).await;
+			break;
+		    }
+		}
             }
-        }
+	}
         println!("Client {:?} disconnected.", addr);
     }
 
