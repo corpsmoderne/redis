@@ -70,7 +70,7 @@ async fn servant_handshake(conf: Arc<Conf>, tx: mpsc::Sender<StoreCmd>) {
     socket.write_all(Resp::from(["ping"]).as_bytes()).await
         .expect("Can't send handshake");
     
-    let mut buff = vec![0 ; 512];
+    let mut buff = vec![0 ; 512 * 10];
     let size = socket.read(&mut buff)
         .await
         .expect("Can't recieve handshake");
