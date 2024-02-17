@@ -1,21 +1,32 @@
 #[derive(Debug)]
 pub struct CommandIter<'a> {
-    pub s: &'a str
+    s: Option<&'a str>
+}
+
+impl<'a> From<&'a str> for CommandIter<'a> {
+    fn from(s: &'a str) -> Self {
+	CommandIter { s: Some(s) }
+    }
 }
 
 impl<'a> Iterator for CommandIter<'a> {
     type Item = Result<Command<'a>, &'static str>;
 
     fn next(&mut self) -> Option<Self::Item> {
-	if self.s == "" || self.s == "\r\n" {
+	let Some(s) = self.s else {
+	    return None;
+	};
+	if s.is_empty() || s == "\r\n" {
+	    self.s = None;
 	    return None;
 	}
-	match parse_cmd(self.s) {
+	match parse_cmd(s) {
 	    Ok((result, s2)) => {
-		self.s = s2;
+		self.s = Some(s2);
 		Some(Ok(result))
 	    },
 	    Err(err) => {
+		self.s = None;
 		Some(Err(err))
 	    }
 	}
@@ -40,12 +51,13 @@ pub enum Section {
     Replication
 }
 
-fn parse_cmd<'a>(s: &'a str) -> Result<(Command<'a>, &'a str), &'static str> {
+fn parse_cmd(s: &str) -> Result<(Command<'_>, &str), &'static str> {
     println!("~~> {s:#?}");
     
-    if s.starts_with("-ERR ") {
-	return Ok((Command::Err(&s[5..]), &s[5..]));
-    }
+    if let Some(stripped) = s.strip_prefix("-ERR ") {
+	let (s1,s2) = stripped.split_once("\r\n").ok_or("parse error")?;
+	return Ok((Command::Err(s1), s2));
+    };
     
     let (nbr, rest) = s.split_once("\r\n").ok_or("parse error")?;
     let Some('*') = nbr.chars().next() else {

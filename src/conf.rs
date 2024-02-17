@@ -10,10 +10,7 @@ pub struct Conf {
 
 impl Conf {
     pub fn is_master(&self) -> bool {
-        match self.role {
-            Role::Master{..} => true,
-            _ => false
-        }
+	matches!(self.role, Role::Master{..})
     }
 }
 

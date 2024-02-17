@@ -121,7 +121,7 @@ async fn servant_handshake(conf: Arc<Conf>, tx: mpsc::Sender<StoreCmd>) {
     };
     println!("== {s:?}");
     
-    let client = Client { addr: (&master_addr[..]).parse().unwrap(),
+    let client = Client { addr: (master_addr[..]).parse().unwrap(),
 			  socket,
                           store_tx: tx.clone(),
                           conf

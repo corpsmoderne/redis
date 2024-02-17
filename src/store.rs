@@ -25,9 +25,9 @@ pub async fn store_server(mut rx: mpsc::Receiver<StoreCmd>) {
     while let Some(message) = rx.recv().await {
         match message {
             StoreCmd::Set(key, value, timeout, tx) => {
-                let timeout2 = timeout.clone().map(| t |
-						   Instant::now() +
-						   Duration::from_millis(t));
+                let timeout2 = timeout.map(| t |
+					   Instant::now() +
+					   Duration::from_millis(t));
                 store.insert(key.clone(), (value.clone(), timeout2));
                 tx.send(())
                     .expect("internal server error: onshot channel");

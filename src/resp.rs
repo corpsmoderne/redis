@@ -21,10 +21,10 @@ impl Resp {
 	Resp::Array(s.as_bytes().to_vec())
     }
 
-    pub fn as_bytes<'a>(&'a self) -> &[u8] {
+    pub fn as_bytes(&self) -> &[u8] {
         match self {
             Resp::Static(a) => a,
-            Resp::Array(v) => &v
+            Resp::Array(v) => v
         }
     }
 }

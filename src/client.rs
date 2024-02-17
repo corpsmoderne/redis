@@ -37,7 +37,7 @@ impl Client {
 
     pub async fn handle(mut self) {
         let mut buff = vec![0 ; 512];
-	let addr = self.addr.clone();
+	let addr = self.addr;
         println!("Client {:?} connected.", addr);
         
         loop {
@@ -50,10 +50,10 @@ impl Client {
             if size == 0 {
                 break;
             }
-            let s = String::from_utf8((buff[0..size]).to_vec())
+            let s = std::str::from_utf8(&buff[0..size])
                 .expect("not utf8");
 
-	    for next_cmd in (CommandIter { s: &s })  {
+	    for next_cmd in CommandIter::from(s) { 
 		match next_cmd {
                     Ok(Command::Commands) => 
 			self.send(Resp::ok()).await,
@@ -74,10 +74,7 @@ impl Client {
 		    Ok(Command::Err(error)) => {
 			println!("** Error: {error:#?}");
 		    },
-                    Err(err) => {
-			self.send_error(err).await;
-			break;
-		    }
+                    Err(err) => self.send_error(err).await
 		}
             }
 	}
