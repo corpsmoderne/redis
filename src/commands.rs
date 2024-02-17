@@ -4,6 +4,7 @@ pub enum Command<'a> {
     Commands,
     Ping,
     Echo(&'a str),
+    Err(&'a str),
     Get(&'a str),
     Set(&'a str, &'a str, Option<u64>),
     Info(Option<Section>),
@@ -20,6 +21,12 @@ impl<'a> TryFrom<&'a str> for Command<'a> {
     type Error = &'static str;
 
     fn try_from(s: &'a str) -> Result<Self, Self::Error> {
+	println!("~~> {s:#?}");
+	
+	if s.starts_with("-ERR ") {
+	    return Ok(Command::Err(&s[5..]));
+	}
+	
         let tbl : Vec<&str> = s.split("\r\n").collect();
         let (cmd, xs) = match &tbl[..] {
             [_, _, cmd, xs@..] => (cmd, xs),
