@@ -39,7 +39,7 @@ impl Client {
             }
             let s = std::str::from_utf8(&buff[0..size])
                 .expect("not utf8");
-
+	    println!("Client got: {s:#?}");
 	    for next_cmd in CommandIter::from(s) { 
 		match next_cmd {
                     Ok(Command::Commands) => 
