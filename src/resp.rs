@@ -1,3 +1,4 @@
+#[derive(Debug,Clone)]
 pub enum Resp {
     Static(&'static [u8]),
     Array(Vec<u8>)
@@ -26,6 +27,17 @@ impl Resp {
             Resp::Static(a) => a,
             Resp::Array(v) => v
         }
+    }
+}
+
+impl TryFrom<Resp> for String {
+    type Error = std::string::FromUtf8Error;
+
+    fn try_from(resp: Resp) -> Result<Self, Self::Error> {
+	match resp {
+	    Resp::Static(a) => String::from_utf8(a.to_vec()),
+	    Resp::Array(v) => String::from_utf8(v)
+	}
     }
 }
 
