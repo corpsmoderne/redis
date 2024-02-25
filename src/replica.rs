@@ -66,13 +66,13 @@ pub async fn servant_handshake(conf: Arc<Conf>, tx: mpsc::Sender<StoreCmd>) {
     )
 	.await
 	.expect("Can't send REPLCONF");
-    let size = socket.read(&mut buff)
+    let _size = socket.read(&mut buff)
         .await
         .expect("Can't recieve handshake");
 
-    let s = String::from_utf8((buff[0..size]).to_vec())
-        .expect("not utf8");
-    println!("=> {s:?}");
+    //let s = String::from_utf8((buff[0..size]).to_vec())
+    //    .expect("not utf8");
+    //println!("=> {s:?}");
 
     let a = read_all(&mut socket).await;
     let mut xs = a.split(| b | b == &b'\n');
